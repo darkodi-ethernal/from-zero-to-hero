@@ -5,8 +5,7 @@ use cw2::set_contract_version;
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, GetCountResponse, InstantiateMsg, QueryMsg};
-use crate::state::{Config, CONFIG, Poll, POLLS};
-use crate::state::{State, STATE};
+use crate::state::{Ballot, Config, Poll, BALLOTS, CONFIG, POLLS};
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:from-zero-to-hero";
@@ -44,7 +43,7 @@ pub fn execute(
             question,
             options,
         } => execute_create_poll(deps, _env, info, poll_id, question, options),
-        ExecuteMsg::Vote { poll_id, vote } => unimplemented!(),
+        ExecuteMsg::Vote { poll_id, vote } => execute_vote(deps, _env, info, poll_id, vote),
         ExecuteMsg::DeletePoll { poll_id } => unimplemented!(),
     }
 }
@@ -65,48 +64,75 @@ fn execute_create_poll(
         opts.push((option, 0)); // all options initially have 0 votes
     }
 
-    let poll = Poll{
+    let poll = Poll {
         creator: info.sender,
         options: opts,
-        question
+        question,
     };
     POLLS.save(deps.storage, poll_id, &poll)?; // save poll to the store
 
     Ok(Response::new())
 }
 
-pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
-    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-        state.count += 1;
-        Ok(state)
-    })?;
+fn execute_vote(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    poll_id: String,
+    vote: String,
+) -> Result<Response, ContractError> {
+    let poll = POLLS.may_load(deps.storage, poll_id.clone())?; // load poll based on id
 
-    Ok(Response::new().add_attribute("method", "try_increment"))
-}
+    match poll {
+        Some(mut poll) => {
+            // The poll exists
+            BALLOTS.update(
+                deps.storage,
+                (info.sender, poll_id.clone()),
+                |ballot| -> StdResult<Ballot> {
+                    match ballot {
+                        Some(ballot) => {
+                            // vote exists
+                            // We need to revoke their old vote
+                            // Find the position
+                            let position_of_old_vote = poll
+                                .options
+                                .iter()
+                                // find user old vote in vector of votes in poll object
+                                .position(|option| option.0 == ballot.option)
+                                .unwrap();
+                            // Decrement by 1
+                            poll.options[position_of_old_vote].1 -= 1;
+                            // Update the ballot
+                            Ok(Ballot {
+                                option: vote.clone(),
+                            })
+                        }
+                        None => {
+                            // Simply add the ballot
+                            Ok(Ballot {
+                                option: vote.clone(),
+                            })
+                        }
+                    }
+                },
+            )?;
 
-pub fn try_reset(deps: DepsMut, info: MessageInfo, count: i32) -> Result<Response, ContractError> {
-    STATE.update(deps.storage, |mut state| -> Result<_, ContractError> {
-        if info.sender != state.owner {
-            return Err(ContractError::Unauthorized {});
+            // Find the position of the new vote option and increment it by 1
+            let position = poll.options.iter().position(|option| option.0 == vote);
+            if position.is_none() {
+                return Err(ContractError::Unauthorized {});
+            }
+            let position = position.unwrap();
+            poll.options[position].1 += 1; // vote
+
+            // Save the update
+            POLLS.save(deps.storage, poll_id, &poll)?;
+            Ok(Response::new())
         }
-        state.count = count;
-        Ok(state)
-    })?;
-    Ok(Response::new().add_attribute("method", "reset"))
-}
-
-#[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    match msg {
-        QueryMsg::GetCount {} => to_binary(&query_count(deps)?),
+        None => Err(ContractError::Unauthorized {}), // The poll does not exist so we just error
     }
 }
-
-fn query_count(deps: Deps) -> StdResult<GetCountResponse> {
-    let state = STATE.load(deps.storage)?;
-    Ok(GetCountResponse { count: state.count })
-}
-
 #[cfg(test)]
 mod tests {
     use crate::contract::instantiate; // the contract instantiate function

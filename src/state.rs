@@ -23,12 +23,13 @@ pub struct Poll {
 }
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Ballot {
-    pub option: String,
+    pub option: String, // vote
 }
 pub const STATE: Item<State> = Item::new("state");
 // A map with a String key and Poll value.
 // The key will be a UUID generated clientside
 pub const POLLS: Map<String, Poll> = Map::new("polls");
+//key: (sender, poll_id),  value: vote option
 pub const BALLOTS: Map<(Addr, String), Ballot> = Map::new("ballots");
 
 pub const CONFIG: Item<Config> = Item::new("config");
