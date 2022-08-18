@@ -19,7 +19,6 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
-    
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     let admin = msg.admin.unwrap_or(info.sender.to_string());
     let validated_admin = deps.api.addr_validate(&admin)?;
@@ -30,8 +29,6 @@ pub fn instantiate(
     Ok(Response::new()
         .add_attribute("action", "instantiate")
         .add_attribute("admin", validated_admin.to_string()))
-
-   
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -79,3 +76,53 @@ fn query_count(deps: Deps) -> StdResult<GetCountResponse> {
     Ok(GetCountResponse { count: state.count })
 }
 
+#[cfg(test)]
+mod tests {
+    use crate::contract::instantiate; // the contract instantiate function
+    use crate::msg::InstantiateMsg;
+    use cosmwasm_std::attr; // helper to construct an attribute e.g. ("action", "instantiate")
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info}; // mock functions to mock an environment, message info, dependencies // our instantate method
+
+    // Two fake addresses we will use to mock_info
+    pub const ADDR1: &str = "addr1";
+    pub const ADDR2: &str = "addr2";
+
+    #[test]
+    fn test_instantiate() {
+        // Mock the dependencies, must be mutable so we can pass it as a mutable, empty vector means our contract has no balance
+        let mut deps = mock_dependencies();
+        // Mock the contract environment, contains the block info, contract address, etc.
+        let env = mock_env();
+        // Mock the message info, ADDR1 will be the sender, the empty vec means we sent no funds.
+        let info = mock_info(ADDR1, &vec![]);
+         // Create a message where we (the sender) will be an admin
+        let msg = InstantiateMsg { admin: None };
+        // Call instantiate, unwrap to assert success
+        let res = instantiate(deps.as_mut(), env, info, msg).unwrap();
+
+        assert_eq!(
+            res.attributes,
+            vec![attr("action", "instantiate"), attr("admin", ADDR1)]
+        )
+
+    }
+    #[test]
+    fn test_instantiate_with_admin() {
+        // Mock the dependencies, must be mutable so we can pass it as a mutable, empty vector means our contract has no balance
+        let mut deps = mock_dependencies();
+        // Mock the contract environment, contains the block info, contract address, etc.
+        let env = mock_env();
+        // Mock the message info, ADDR1 will be the sender, the empty vec means we sent no funds.
+        let info = mock_info(ADDR1, &vec![]);
+         // Create a message where we (the sender) will be an admin
+        let msg = InstantiateMsg { admin: Some(ADDR2.to_string()) };
+        // Call instantiate, unwrap to assert success
+        let res = instantiate(deps.as_mut(), env, info, msg).unwrap();
+
+        assert_eq!(
+            res.attributes,
+            vec![attr("action", "instantiate"), attr("admin", ADDR2)]
+        )
+
+    }
+}

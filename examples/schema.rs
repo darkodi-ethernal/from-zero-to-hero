@@ -3,7 +3,10 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use from_zero_to_hero::{msg::{ExecuteMsg, GetCountResponse, InstantiateMsg, QueryMsg}, state::{Poll, Ballot, Config}};
+use from_zero_to_hero::{
+    msg::{ExecuteMsg, GetCountResponse, InstantiateMsg, QueryMsg},
+    state::{Ballot, Config, Poll},
+};
 
 fn main() {
     let mut out_dir = current_dir().unwrap();
