@@ -5,7 +5,7 @@ use cw2::set_contract_version;
 
 use crate::error::ContractError;
 use crate::msg::{ExecuteMsg, GetCountResponse, InstantiateMsg, QueryMsg};
-use crate::state::{Config, CONFIG};
+use crate::state::{Config, CONFIG, Poll, POLLS};
 use crate::state::{State, STATE};
 
 // version info for migration info
@@ -39,9 +39,40 @@ pub fn execute(
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
     match msg {
-        ExecuteMsg::Increment {} => try_increment(deps),
-        ExecuteMsg::Reset { count } => try_reset(deps, info, count),
+        ExecuteMsg::CreatePoll {
+            poll_id,
+            question,
+            options,
+        } => execute_create_poll(deps, _env, info, poll_id, question, options),
+        ExecuteMsg::Vote { poll_id, vote } => unimplemented!(),
+        ExecuteMsg::DeletePoll { poll_id } => unimplemented!(),
     }
+}
+
+fn execute_create_poll(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    poll_id: String,
+    question: String,
+    options: Vec<String>,
+) -> Result<Response, ContractError> {
+    if options.len() > 5 {
+        return Err(ContractError::TooManyOptions {});
+    }
+    let mut opts: Vec<(String, u64)> = vec![];
+    for option in options {
+        opts.push((option, 0)); // all options initially have 0 votes
+    }
+
+    let poll = Poll{
+        creator: info.sender,
+        options: opts,
+        question
+    };
+    POLLS.save(deps.storage, poll_id, &poll)?; // save poll to the store
+
+    Ok(Response::new())
 }
 
 pub fn try_increment(deps: DepsMut) -> Result<Response, ContractError> {
@@ -95,7 +126,7 @@ mod tests {
         let env = mock_env();
         // Mock the message info, ADDR1 will be the sender, the empty vec means we sent no funds.
         let info = mock_info(ADDR1, &vec![]);
-         // Create a message where we (the sender) will be an admin
+        // Create a message where we (the sender) will be an admin
         let msg = InstantiateMsg { admin: None };
         // Call instantiate, unwrap to assert success
         let res = instantiate(deps.as_mut(), env, info, msg).unwrap();
@@ -104,7 +135,6 @@ mod tests {
             res.attributes,
             vec![attr("action", "instantiate"), attr("admin", ADDR1)]
         )
-
     }
     #[test]
     fn test_instantiate_with_admin() {
@@ -114,8 +144,10 @@ mod tests {
         let env = mock_env();
         // Mock the message info, ADDR1 will be the sender, the empty vec means we sent no funds.
         let info = mock_info(ADDR1, &vec![]);
-         // Create a message where we (the sender) will be an admin
-        let msg = InstantiateMsg { admin: Some(ADDR2.to_string()) };
+        // Create a message where we (the sender) will be an admin
+        let msg = InstantiateMsg {
+            admin: Some(ADDR2.to_string()),
+        };
         // Call instantiate, unwrap to assert success
         let res = instantiate(deps.as_mut(), env, info, msg).unwrap();
 
@@ -123,6 +155,5 @@ mod tests {
             res.attributes,
             vec![attr("action", "instantiate"), attr("admin", ADDR2)]
         )
-
     }
 }
