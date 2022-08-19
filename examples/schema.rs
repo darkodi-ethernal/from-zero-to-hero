@@ -20,5 +20,4 @@ fn main() {
     export_schema(&schema_for!(Config), &out_dir);
     export_schema(&schema_for!(Poll), &out_dir);
     export_schema(&schema_for!(Ballot), &out_dir);
-    export_schema(&schema_for!(GetCountResponse), &out_dir);
 }
