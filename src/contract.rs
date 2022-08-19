@@ -69,9 +69,11 @@ fn execute_create_poll(
         options: opts,
         question,
     };
-    POLLS.save(deps.storage, poll_id, &poll)?; // save poll to the store
+    POLLS.save(deps.storage, poll_id.clone(), &poll)?; // save poll to the store
 
-    Ok(Response::new())
+    Ok(Response::new()
+        .add_attribute("action", "create_poll")
+        .add_attribute("poll_id", poll_id.to_string()))
 }
 
 fn execute_vote(
@@ -121,22 +123,25 @@ fn execute_vote(
             // Find the position of the new vote option and increment it by 1
             let position = poll.options.iter().position(|option| option.0 == vote);
             if position.is_none() {
-                return Err(ContractError::Unauthorized {});
+                return Err(ContractError::VoteOptionNotFound {});
             }
             let position = position.unwrap();
             poll.options[position].1 += 1; // vote
 
             // Save the update
-            POLLS.save(deps.storage, poll_id, &poll)?;
-            Ok(Response::new())
+            POLLS.save(deps.storage, poll_id.clone(), &poll)?;
+            Ok(Response::new()
+                .add_attribute("action", "vote")
+                .add_attribute("poll_id", poll_id.to_string())
+                .add_attribute(vote.to_string(), poll.options[position].1.to_string()))
         }
-        None => Err(ContractError::Unauthorized {}), // The poll does not exist so we just error
+        None => Err(ContractError::PollNotFound {}), // The poll does not exist so we just error
     }
 }
 #[cfg(test)]
 mod tests {
-    use crate::contract::instantiate; // the contract instantiate function
-    use crate::msg::InstantiateMsg;
+    use crate::contract::{execute, instantiate};
+    use crate::msg::{ExecuteMsg, InstantiateMsg};
     use cosmwasm_std::attr; // helper to construct an attribute e.g. ("action", "instantiate")
     use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info}; // mock functions to mock an environment, message info, dependencies // our instantate method
 
@@ -181,5 +186,35 @@ mod tests {
             res.attributes,
             vec![attr("action", "instantiate"), attr("admin", ADDR2)]
         )
+    }
+
+    #[test]
+    fn test_execute_create_poll_valid() {
+        //first instantiate contract
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = mock_info(ADDR1, &vec![]);
+        // Instantiate the contract
+        let msg = InstantiateMsg { admin: None };
+        let _res = instantiate(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+        // New execute msg
+        let msg = ExecuteMsg::CreatePoll {
+            poll_id: "100".to_string(),
+            question: "What's your favourite Cosmos coin?".to_string(),
+            options: vec![
+                "Cosmos Hub".to_string(),
+                "Juno".to_string(),
+                "Osmosis".to_string(),
+            ],
+        };
+        // Unwrap to assert success
+        // Unwrapping will throw any errors if it fails
+        let res = execute(deps.as_mut(), env, info, msg).unwrap();
+        assert_eq!(
+            res.attributes,
+            vec![attr("action", "create_poll"), attr("poll_id", "100")]
+        )
+
     }
 }

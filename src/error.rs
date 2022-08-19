@@ -15,4 +15,11 @@ pub enum ContractError {
     // Look at https://docs.rs/thiserror/1.0.21/thiserror/ for details.
     #[error("Too many poll options")]
     TooManyOptions {},
+    
+    #[error("Poll not found")]
+    PollNotFound {},
+
+    #[error("Vote option not found")]
+    VoteOptionNotFound {},
+
 }
