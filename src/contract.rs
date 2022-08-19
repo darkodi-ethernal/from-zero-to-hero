@@ -1,10 +1,15 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
-use cosmwasm_std::{to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult};
+use cosmwasm_std::{
+    to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult,
+};
 use cw2::set_contract_version;
 
 use crate::error::ContractError;
-use crate::msg::{ExecuteMsg, GetCountResponse, InstantiateMsg, QueryMsg};
+use crate::msg::{
+    AllPollsResponse, ConfigResponse, ExecuteMsg, InstantiateMsg, PollResponse, QueryMsg,
+    VoteResponse,
+};
 use crate::state::{Ballot, Config, Poll, BALLOTS, CONFIG, POLLS};
 
 // version info for migration info
@@ -138,6 +143,43 @@ fn execute_vote(
         None => Err(ContractError::PollNotFound {}), // The poll does not exist so we just error
     }
 }
+
+#[cfg_attr(not(feature = "library"), entry_point)]
+pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    match msg {
+        QueryMsg::AllPolls {} => query_all_polls(deps, env),
+        QueryMsg::Poll { poll_id } => query_poll(deps, env, poll_id),
+        QueryMsg::Vote { address, poll_id } => query_vote(deps, env, address, poll_id),
+        QueryMsg::Config {} => query_config(deps, env),
+    }
+}
+
+fn query_all_polls(deps: Deps, _env: Env) -> StdResult<Binary> {
+    let polls = POLLS
+        .range(deps.storage, None, None, Order::Ascending)
+        .map(|p| Ok(p?.1))
+        .collect::<StdResult<Vec<_>>>()?;
+
+    to_binary(&AllPollsResponse { polls })
+}
+
+fn query_poll(deps: Deps, _env: Env, poll_id: String) -> StdResult<Binary> {
+    let poll = POLLS.may_load(deps.storage, poll_id)?;
+    to_binary(&PollResponse { poll })
+}
+
+fn query_vote(deps: Deps, _env: Env, address: String, poll_id: String) -> StdResult<Binary> {
+    let validated_address = deps.api.addr_validate(&address).unwrap(); // validate address
+    let vote = BALLOTS.may_load(deps.storage, (validated_address, poll_id))?; // retrieve user option/vote
+    to_binary(&VoteResponse { vote }) // encode to binary
+}
+
+fn query_config(deps: Deps, _env: Env) -> StdResult<Binary> {
+    let config = CONFIG.load(deps.storage).unwrap();
+    let resp = config.admin.to_string();
+    to_binary(&ConfigResponse { admin: resp }) // encode to binary
+}
+
 #[cfg(test)]
 mod tests {
     use crate::contract::{execute, instantiate};

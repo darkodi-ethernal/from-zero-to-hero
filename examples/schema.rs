@@ -4,7 +4,7 @@ use std::fs::create_dir_all;
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
 use from_zero_to_hero::{
-    msg::{ExecuteMsg, GetCountResponse, InstantiateMsg, QueryMsg},
+    msg::{ExecuteMsg, InstantiateMsg, QueryMsg},
     state::{Ballot, Config, Poll},
 };
 
