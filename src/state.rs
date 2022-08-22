@@ -12,7 +12,7 @@ pub struct State {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct Config {
-    pub admin: Addr
+    pub admin: Addr,
 }
 // Derive JSON serialization
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -33,4 +33,3 @@ pub const POLLS: Map<String, Poll> = Map::new("polls");
 pub const BALLOTS: Map<(Addr, String), Ballot> = Map::new("ballots");
 
 pub const CONFIG: Item<Config> = Item::new("config");
-
