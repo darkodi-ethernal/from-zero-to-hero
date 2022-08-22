@@ -1,5 +1,5 @@
 #[cfg(not(feature = "library"))]
-use cosmwasm_std::entry_point;
+use cosmwasm_std::{attr, entry_point, from_binary};
 use cosmwasm_std::{
     to_binary, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response, StdResult,
 };
@@ -183,10 +183,12 @@ fn query_config(deps: Deps, _env: Env) -> StdResult<Binary> {
 #[cfg(test)]
 mod tests {
     use crate::contract::{execute, instantiate};
-    use crate::msg::{ExecuteMsg, InstantiateMsg};
+    use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg, AllPollsResponse};
     use crate::ContractError;
-    use cosmwasm_std::attr; // helper to construct an attribute e.g. ("action", "instantiate")
-    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info}; // mock functions to mock an environment, message info, dependencies // our instantate method
+    use cosmwasm_std::{attr, from_binary}; // helper to construct an attribute e.g. ("action", "instantiate")
+    use cosmwasm_std::testing::{mock_dependencies, mock_env, mock_info};
+
+    use super::query; // mock functions to mock an environment, message info, dependencies // our instantate method
 
     // Two fake addresses we will use to mock_info
     pub const ADDR1: &str = "addr1";
@@ -424,4 +426,40 @@ mod tests {
         let err = execute(deps.as_mut(), env, info, msg).unwrap_err();
         assert_eq!(err, ContractError::VoteOptionNotFound {});
     }
+    #[test]
+    fn test_query_all_polls() {
+        let mut deps = mock_dependencies();
+        let env = mock_env();
+        let info = mock_info(ADDR1, &vec![]);
+        // Instantiate the contract
+        let msg = InstantiateMsg { admin: None };
+        let _res = instantiate(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+        // Create a poll
+        let msg = ExecuteMsg::CreatePoll {
+            poll_id: "some_id_1".to_string(),
+            question: "What's your favourite Cosmos coin?".to_string(),
+            options: vec![
+                "Cosmos Hub".to_string(),
+                "Juno".to_string(),
+                "Osmosis".to_string(),
+            ],
+        };
+        let _res = execute(deps.as_mut(), env.clone(), info.clone(), msg).unwrap();
+
+        // Create a second poll
+        let msg = ExecuteMsg::CreatePoll {
+            poll_id: "some_id_2".to_string(),
+            question: "What's your colour?".to_string(),
+            options: vec!["Red".to_string(), "Green".to_string(), "Blue".to_string()],
+        };
+        let _res = execute(deps.as_mut(), env.clone(), info, msg).unwrap();
+        // Query
+        let msg = QueryMsg::AllPolls {};
+        let bin = query(deps.as_ref(), env, msg).unwrap(); // as_ref because query cannot change state
+        let res: AllPollsResponse = from_binary(&bin).unwrap(); // decode from binary, must contain type (AllPollsResponse)
+        assert_eq!(res.polls.len(), 2); // expect 2 polls
+
+        
+    }
+    
 }
